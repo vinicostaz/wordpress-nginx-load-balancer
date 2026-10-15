@@ -1,0 +1,92 @@
+x-wordpress-common: &wordpress-common
+  image: wordpress:5.4.2-php7.2-apache
+  restart: unless-stopped
+  environment:
+    WORDPRESS_DB_HOST: mysql:3306
+    WORDPRESS_DB_USER: ${MYSQL_USER:-wordpress}
+    WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD no arquivo .env}
+    WORDPRESS_DB_NAME: ${MYSQL_DATABASE:-wordpress}
+  volumes:
+    - ./wordpress_data:/var/www/html
+  networks:
+    - frontend
+    - backend
+  healthcheck:
+    test: ["CMD-SHELL", "test -f /var/www/html/wp-includes/version.php && test -f /var/www/html/wp-config.php && php -r 'exit(@fsockopen(\"127.0.0.1\", 80) ? 0 : 1);'"]
+    interval: 3s
+    timeout: 3s
+    retries: 20
+    start_period: 10s
+
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no arquivo .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-wordpress}
+      MYSQL_USER: ${MYSQL_USER:-wordpress}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD no arquivo .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  wordpress1:
+    <<: *wordpress-common
+    container_name: wordpress1
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  wordpress2:
+    <<: *wordpress-common
+    container_name: wordpress2
+    depends_on:
+      mysql:
+        condition: service_healthy
+      wordpress1:
+        condition: service_healthy
+
+  wordpress3:
+    <<: *wordpress-common
+    container_name: wordpress3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      wordpress1:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.19.0
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./wordpress_data:/usr/share/nginx/html:ro
+    networks:
+      - frontend
+    depends_on:
+      wordpress1:
+        condition: service_healthy
+      wordpress2:
+        condition: service_healthy
+      wordpress3:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+
+networks:
+  frontend:
+  backend:
+    internal: true

@@ -1,0 +1,14 @@
+# Credenciais e configuracoes locais
+.env
+
+# Conteudo gerado durante a execucao
+wordpress_data/*
+!wordpress_data/.gitkeep
+*.log
+
+# Materiais do enunciado (nao fazem parte da aplicacao)
+*.pdf
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
